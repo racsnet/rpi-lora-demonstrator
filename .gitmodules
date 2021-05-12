@@ -1,0 +1,3 @@
+[submodule "raspi-lmic"]
+	path = raspi-lmic
+	url = https://github.com/pmanzoni/raspi-lmic.git

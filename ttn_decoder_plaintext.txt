@@ -1,0 +1,67 @@
+function uint(bytes) {
+
+  return bytes.reduceRight(function(acc, b) {
+    return acc * 0x100 + b;
+  }, 0);
+}
+
+// Convert an array of bytes into a float: bytesToFloat([ 0x3B, 0x2F, 0x7A, 0x1A ]) => 0.0026775659061968327
+// Based on https://stackoverflow.com/a/37471538 by Ilya Bursov
+function bytesToFloat(bytes) {
+    // JavaScript bitwise operators yield a 32 bits integer, not a float.
+    // Assume MSB (most significant byte first).
+    var bits = bytes[0] << 24 | bytes[1] << 16 | bytes[2] << 8 | bytes[3];
+    var sign = (bits >>> 31 === 0) ? 1.0 : -1.0;
+    var e = bits >>> 23 & 0xff;
+    var m = (e === 0) ? (bits & 0x7fffff) << 1 : (bits & 0x7fffff) | 0x800000;
+    var f = sign * m * Math.pow(2, e - 150);
+    return f;
+}
+
+function Bytes2Float32(bytes) {
+    var sign = (bytes & 0x80000000) ? -1 : 1;
+    var exponent = ((bytes >> 23) & 0xFF) - 127;
+    var significand = (bytes & ~(-1 << 23));
+
+    if (exponent == 128)
+        return sign * ((significand) ? Number.NaN : Number.POSITIVE_INFINITY);
+
+    if (exponent == -127) {
+        if (significand == 0) return sign * 0.0;
+        exponent = -126;
+        significand /= (1 << 22);
+    } else significand = (significand | (1 << 23)) / (1 << 23);
+
+    return sign * significand * Math.pow(2, exponent);
+}
+
+function decodeUplink(input) {
+  return {
+    data: {
+      bytes: input.bytes
+    },
+    warnings: [],
+    errors: []
+  };
+}
+
+function Decoder(bytes, port) {
+  console.log(bytes);
+  var decoded = {};
+  if(port === 1) {
+    var i = 0;
+    var temp = bytes[3] << 24 | bytes[2] << 16 | bytes[1] << 8 | bytes[0];
+    decoded.BATTERY = temp;
+  }
+  else if(port === 2) {
+    var lt_i = 0;
+    decoded.UPTIME = bytes[3] << 24 | bytes[2] << 16 | bytes[1] << 8 | bytes[0];
+    decoded.LOAD1 = Bytes2Float32(bytes[7] << 24 | bytes[6] << 16 | bytes[5] << 8 | bytes[4]);
+    decoded.LOAD5 = Bytes2Float32(bytes[11] << 24 | bytes[10] << 16 | bytes[9] << 8 | bytes[8]);
+    decoded.LOAD15 = Bytes2Float32(bytes[15] << 24 | bytes[14] << 16 | bytes[13] << 8 | bytes[12]);
+  }
+  else {
+    decoded.STDOUT = "unknwon Port";
+  }
+  return decoded;
+}
