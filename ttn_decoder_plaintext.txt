@@ -1,10 +1,3 @@
-function uint(bytes) {
-
-  return bytes.reduceRight(function(acc, b) {
-    return acc * 0x100 + b;
-  }, 0);
-}
-
 // Convert an array of bytes into a float: bytesToFloat([ 0x3B, 0x2F, 0x7A, 0x1A ]) => 0.0026775659061968327
 // Based on https://stackoverflow.com/a/37471538 by Ilya Bursov
 function bytesToFloat(bytes) {
@@ -27,7 +20,7 @@ function Bytes2Float32(bytes) {
         return sign * ((significand) ? Number.NaN : Number.POSITIVE_INFINITY);
 
     if (exponent == -127) {
-        if (significand == 0) return sign * 0.0;
+        if (significand === 0) return sign * 0.0;
         exponent = -126;
         significand /= (1 << 22);
     } else significand = (significand | (1 << 23)) / (1 << 23);
@@ -46,12 +39,11 @@ function decodeUplink(input) {
 }
 
 function Decoder(bytes, port) {
-  console.log(bytes);
   var decoded = {};
   if(port === 1) {
     var i = 0;
     var temp = bytes[3] << 24 | bytes[2] << 16 | bytes[1] << 8 | bytes[0];
-    decoded.BATTERY = temp;
+    decoded.CPUTEMP = temp;
   }
   else if(port === 2) {
     var lt_i = 0;
@@ -64,4 +56,32 @@ function Decoder(bytes, port) {
     decoded.STDOUT = "unknwon Port";
   }
   return decoded;
+}
+
+function decodeUplink(input) {
+  var data = input.bytes;
+  var valid = true;
+
+  if (typeof Decoder === "function") {
+    data = Decoder(data, input.fPort);
+  }
+
+  if (typeof Converter === "function") {
+    data = Converter(data, input.fPort);
+  }
+
+  if (typeof Validator === "function") {
+    valid = Validator(data, input.fPort);
+  }
+
+  if (valid) {
+    return {
+      data: data
+    };
+  } else {
+    return {
+      data: {},
+      errors: ["Invalid data received"]
+    };
+  }
 }

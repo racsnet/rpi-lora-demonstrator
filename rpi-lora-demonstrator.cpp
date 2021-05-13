@@ -36,21 +36,21 @@
 #include <string.h>
 #include <stdlib.h>
 
-
 #include <lmic.h>
 #include <hal/hal.h>
 
 #include "rpi-lora-demonstrator.h"
 
 int port = 1;
+byte recv_buffer[] = { 0x00, 0x00, 0x00, 0x00 };
 
 union l2ba{
    long lvalue;
    uint8_t bvalue[4];
 };
 
-union d2ba{
-   double dvalue;
+union f2ba{
+   float fvalue;
    uint8_t bvalue[4];
 };
 
@@ -78,7 +78,7 @@ unsigned long get_temp(void) {
 void do_send(osjob_t* j) {
     char strTime[16];
     l2ba uptime, temp;
-    d2ba load1, load5, load15;
+    f2ba load1, load5, load15;
     double load[3];
 
     getSystemTime(strTime , sizeof(strTime));
@@ -90,26 +90,26 @@ void do_send(osjob_t* j) {
     } else {
         digitalWrite(RF_LED_PIN, HIGH);
         if (port == 1) {
-          uptime.lvalue = get_uptime();
-          if (getloadavg(load, 3) != -1) {
-            load1.dvalue = load[0];
-            load5.dvalue = load[1];
-            load15.dvalue = load[2];
-            printf("load average : %f , %f , %f\n", load[0],load[1],load[2]);
-          }
-          else {
-            load1.dvalue = 999.99;
-            load5.dvalue = 9999.99;
-            load15.dvalue = 9999.99;
-          }
-          uint8_t mydata[] = { uptime.bvalue[0], uptime.bvalue[1], uptime.bvalue[2], uptime.bvalue[3], load1.bvalue[0], load1.bvalue[1], load1.bvalue[2], load1.bvalue[3], load5.bvalue[0], load5.bvalue[1], load5.bvalue[2], load5.bvalue[3], load15.bvalue[0], load15.bvalue[1], load15.bvalue[2], load15.bvalue[3], };
-          LMIC_setTxData2(port, mydata, sizeof(mydata)-1, 0);
+          temp.lvalue = get_temp();
+          uint8_t mydata[] = { temp.bvalue[0], temp.bvalue[1], temp.bvalue[2], temp.bvalue[3], recv_buffer[0], recv_buffer[1], recv_buffer[2], recv_buffer[3] };
+          LMIC_setTxData2(port, mydata, sizeof(mydata), 0);
           port = 2;
         }
         else {
-          temp.lvalue = get_temp();
-          uint8_t mydata[] = { temp.bvalue[0], temp.bvalue[1], temp.bvalue[2], temp.bvalue[3] };
-          LMIC_setTxData2(port, mydata, sizeof(mydata)-1, 0);
+          uptime.lvalue = get_uptime();
+          if (getloadavg(load, 3) != -1) {
+            load1.fvalue = load[0];
+            load5.fvalue = load[1];
+            load15.fvalue = load[2];
+            printf("load average : %f , %f , %f\n", load[0],load[1],load[2]);
+          }
+          else {
+            load1.fvalue = 999.99;
+            load5.fvalue = 9999.99;
+            load15.fvalue = 9999.99;
+          }
+          uint8_t mydata[] = { uptime.bvalue[0], uptime.bvalue[1], uptime.bvalue[2], uptime.bvalue[3], load1.bvalue[0], load1.bvalue[1], load1.bvalue[2], load1.bvalue[3], load5.bvalue[0], load5.bvalue[1], load5.bvalue[2], load5.bvalue[3], load15.bvalue[0], load15.bvalue[1], load15.bvalue[2], load15.bvalue[3], };
+          LMIC_setTxData2(port, mydata, sizeof(mydata), 0);
           port = 1;
         }
         printf("Packet queued\n");
@@ -159,7 +159,13 @@ void onEvent (ev_t ev) {
             if (LMIC.txrxFlags & TXRX_ACK)
               printf("%s Received ack\n", strTime);
             if (LMIC.dataLen) {
-              printf("%s Received %d bytes of payload\n", strTime, LMIC.dataLen);
+              printf("############################################### %s Received %d bytes of payload\n", strTime, LMIC.dataLen);
+//              byte payload[LMIC.dataLen];
+              for (int i = 0; i < LMIC.dataLen; i++) {
+                  if ( i <= sizeof(recv_buffer) ) {
+                      recv_buffer[i] = LMIC.frame[i];
+                  }
+              }
             }
             digitalWrite(RF_LED_PIN, LOW);
             // Schedule next transmission
